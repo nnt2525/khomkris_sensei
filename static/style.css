@@ -1,0 +1,28 @@
+body { 
+    
+    font-family: sans-serif; 
+    text-align: center; 
+    margin-top: 50px; 
+}
+        
+.open-button { 
+    padding: 15px 30px; 
+    font-size: 18px; 
+    background-color: #28a745; 
+    color: white; 
+    border: none; 
+    border-radius: 5px; 
+    cursor: pointer; 
+}
+.close-button { 
+    padding: 15px 30px; 
+    font-size: 18px; 
+    background-color: #dc3545; 
+    color: white; 
+    border: none; 
+    border-radius: 5px; 
+    cursor: pointer; 
+}
+.open-button:active, .close-button:active { 
+    opacity: 0.8; 
+}
