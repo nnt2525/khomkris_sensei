@@ -1,28 +1,32 @@
 body { 
-    
-    font-family: sans-serif; 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
     text-align: center; 
-    margin-top: 50px; 
+    background-color: #f4f4f9; 
+    padding-top: 50px;
 }
-        
+
+h1 { color: #333; }
+.button-container { margin-top: 30px; }
+
+.open-button, .close-button { 
+    padding: 20px 40px; 
+    border-radius: 10px; 
+    cursor: pointer; 
+    border: none;
+    font-size: 18px;
+    margin: 10px;
+    transition: 0.3s;
+}
 .open-button { 
-    padding: 15px 30px; 
-    font-size: 18px; 
     background-color: #28a745; 
     color: white; 
-    border: none; 
-    border-radius: 5px; 
-    cursor: pointer; 
 }
 .close-button { 
-    padding: 15px 30px; 
-    font-size: 18px; 
     background-color: #dc3545; 
     color: white; 
-    border: none; 
-    border-radius: 5px; 
-    cursor: pointer; 
 }
-.open-button:active, .close-button:active { 
-    opacity: 0.8; 
-}
+
+.open-button:hover, .close-button:hover { opacity: 0.8; transform: scale(1.05); }
+
+#status-container { margin-bottom: 20px; font-size: 1.2em; }
+#status { font-weight: bold; color: orange; }
