@@ -5,7 +5,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const session = require('express-session');
-const mysql = require('mysql2/promise'); // ใช้ Promise
+const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 
 console.log('DB_USER:', process.env.DB_USER); 
@@ -15,19 +15,22 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// *** เพิ่มบรรทัดนี้เพื่อให้รับค่า JSON จาก fetch ได้ ***
 app.use(express.json()); 
 app.use(express.static(path.join(__dirname, 'static')));
 
-app.set('trust proxy', 1);
+// บอก Express ว่าถ้ามีคนพิมพ์ URL ว่า /dashboard ให้ส่งไฟล์ dashboard.html ไปให้
+app.get('/dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'static', 'dashboard.html'));
+});
+
+// แก้ตรงนี้: ใส่ || ไว้กันเซิร์ฟเวอร์พังเผื่อหาค่าใน .env ไม่เจอ
+const sessionSecret = process.env.SESSION_SECRET || 'my_super_secret_fallback_key_123';
 app.use(session({
-    secret: process.env.SESSION_SECRET,
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: { 
-        // secure: false, // ถ้าขึ้น Server จริง (https) ให้แก้เป็น true
-        secure: process.env.NODE_ENV === 'production', 
-        sameSite: 'lax', 
+        secure: false, 
         maxAge: 24 * 60 * 60 * 1000 
     }
 }));
@@ -39,12 +42,9 @@ const db = mysql.createPool({
     database: process.env.DB_NAME
 });
 
-// แก้ไข Route Login ให้เป็น async/await
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-
-        // ใช้ await แทน callback
         const [results] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
 
         if (results.length === 0) {
@@ -54,7 +54,8 @@ app.post('/api/login', async (req, res) => {
         const user = results[0];
         let isMatch = false;
 
-        if (user.password.startsWith('$2')) {
+        // เช็คว่ามี password และเป็น hash จริงๆ ก่อนเทียบ (กัน Error)
+        if (user.password && user.password.startsWith('$2')) {
             isMatch = await bcrypt.compare(password, user.password);
         } else {
             isMatch = (password === user.password);
@@ -64,8 +65,10 @@ app.post('/api/login', async (req, res) => {
             return res.json({ status: 'error', message: 'รหัสผ่านไม่ถูกต้อง' });
         }
 
-        // หมายเหตุ: req.session จะใช้ได้ต้องลง express-session เพิ่ม
-        // ถ้ายังไม่ได้ลง ให้ส่ง user กลับไปให้ฝั่ง Client เก็บใน localStorage แทน
+        // *** จุดที่เพิ่มใหม่: บันทึกข้อมูลลง Session เมื่อล็อกอินสำเร็จ ***
+        req.session.userId = user.id;
+        req.session.isLoggedIn = true;
+
         res.json({ status: 'ok', user: { id: user.id, email: user.email, name: user.name } });
 
     } catch (err) {
@@ -73,21 +76,36 @@ app.post('/api/login', async (req, res) => {
         res.status(500).json({ status: 'error', message: 'Database Error' });
     }
 });
-// ดึงข้อมูลอุปกรณ์เฉพาะของคนที่ Login อยู่
-app.get('/api/devices/:userId', async (req, res) => {
+
+const requireLogin = (req, res, next) => {
+    // ตรวจสอบว่ามี session และมีสถานะ isLoggedIn เป็น true หรือไม่
+    if (req.session && req.session.isLoggedIn) {
+        next(); // ถ้าล็อกอินแล้ว อนุญาตให้ไปทำคำสั่งต่อไปได้
+    } else {
+        // ถ้ายังไม่ล็อกอิน ให้ส่ง Error 401 (Unauthorized) กลับไป
+        res.status(401).json({ status: 'error', message: 'กรุณาล็อกอินก่อนเข้าใช้งาน' });
+    }
+};
+
+app.get('/api/devices/:userId', requireLogin, async (req, res) => {
     try {
         const userId = req.params.userId;
-
-        // คำสั่ง SQL: เลือกทุกอย่างจากตาราง devices ที่ user_id ตรงกับที่เราส่งมา
         const [rows] = await db.query('SELECT * FROM devices WHERE user_id = ?', [userId]);
-
         res.json({ status: 'ok', devices: rows });
     } catch (err) {
         console.error(err);
         res.status(500).json({ status: 'error', message: 'Database Error' });
     }
 });
-// WebSocket logic (คงเดิมไว้ได้เลย)
+
+app.get('/api/check-auth', (req, res) => {
+    if (req.session && req.session.isLoggedIn) {
+        res.json({ status: 'ok', isLoggedIn: true, userId: req.session.userId });
+    } else {
+        res.json({ status: 'error', isLoggedIn: false });
+    }
+});
+
 wss.on('connection', (ws) => {
     console.log('✅ อุปกรณ์เชื่อมต่อแล้ว');
     ws.on('message', (message) => {
