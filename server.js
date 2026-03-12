@@ -1,39 +1,104 @@
+const dotenv = require('dotenv');
+dotenv.config();
 const express = require('express');
 const http = require('http');
-const WebSocket = require('ws'); // เรียกใช้ไลบรารี่ ws แท้ๆ
+const WebSocket = require('ws');
 const path = require('path');
+const session = require('express-session');
+const mysql = require('mysql2/promise'); // ใช้ Promise
+const bcrypt = require('bcrypt');
+
+console.log('DB_USER:', process.env.DB_USER); 
+console.log('DB_NAME:', process.env.DB_NAME);
 
 const app = express();
 const server = http.createServer(app);
-// สร้าง WebSocket Server ครอบทับ HTTP Server อีกที
-const wss = new WebSocket.Server({ server }); 
+const wss = new WebSocket.Server({ server });
 
-app.use(express.static(path.join(__dirname, 'static'))); // ให้บริการไฟล์ในโฟลเดอร์ static
+// *** เพิ่มบรรทัดนี้เพื่อให้รับค่า JSON จาก fetch ได้ ***
+app.use(express.json()); 
+app.use(express.static(path.join(__dirname, 'static')));
 
-// เมื่อมี Client (Web หรือ ESP32) เชื่อมต่อเข้ามา
-wss.on('connection', (ws, req) => {
-    console.log('✅ มีอุปกรณ์เชื่อมต่อเข้ามาใหม่! IP:', req.socket.remoteAddress);
+app.set('trust proxy', 1);
+app.use(session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+        // secure: false, // ถ้าขึ้น Server จริง (https) ให้แก้เป็น true
+        secure: process.env.NODE_ENV === 'production', 
+        sameSite: 'lax', 
+        maxAge: 24 * 60 * 60 * 1000 
+    }
+}));
 
-    // รอรับข้อความ (Trigger) จากหน้าเว็บ
+const db = mysql.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME
+});
+
+// แก้ไข Route Login ให้เป็น async/await
+app.post('/api/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // ใช้ await แทน callback
+        const [results] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+
+        if (results.length === 0) {
+            return res.json({ status: 'error', message: 'อีเมลไม่ถูกต้อง' });
+        }
+
+        const user = results[0];
+        let isMatch = false;
+
+        if (user.password.startsWith('$2')) {
+            isMatch = await bcrypt.compare(password, user.password);
+        } else {
+            isMatch = (password === user.password);
+        }
+
+        if (!isMatch) {
+            return res.json({ status: 'error', message: 'รหัสผ่านไม่ถูกต้อง' });
+        }
+
+        // หมายเหตุ: req.session จะใช้ได้ต้องลง express-session เพิ่ม
+        // ถ้ายังไม่ได้ลง ให้ส่ง user กลับไปให้ฝั่ง Client เก็บใน localStorage แทน
+        res.json({ status: 'ok', user: { id: user.id, email: user.email, name: user.name } });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ status: 'error', message: 'Database Error' });
+    }
+});
+// ดึงข้อมูลอุปกรณ์เฉพาะของคนที่ Login อยู่
+app.get('/api/devices/:userId', async (req, res) => {
+    try {
+        const userId = req.params.userId;
+
+        // คำสั่ง SQL: เลือกทุกอย่างจากตาราง devices ที่ user_id ตรงกับที่เราส่งมา
+        const [rows] = await db.query('SELECT * FROM devices WHERE user_id = ?', [userId]);
+
+        res.json({ status: 'ok', devices: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ status: 'error', message: 'Database Error' });
+    }
+});
+// WebSocket logic (คงเดิมไว้ได้เลย)
+wss.on('connection', (ws) => {
+    console.log('✅ อุปกรณ์เชื่อมต่อแล้ว');
     ws.on('message', (message) => {
-        // แปลงข้อความที่รับมาให้อ่านง่ายขึ้น
-        const command = message.toString(); 
-        console.log('📩 ได้รับคำสั่ง:', command);
-        
-        // บรอดคาสต์ (Broadcast) กระจายคำสั่งนี้ไปให้ทุกอุปกรณ์ที่ต่ออยู่ (รวมถึง ESP32)
+        const command = message.toString();
         wss.clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
                 client.send(command);
             }
         });
     });
-
-    ws.on('close', () => {
-        console.log('❌ อุปกรณ์ยกเลิกการเชื่อมต่อ');
-    });
 });
 
 const PORT = 3000;
-server.listen(PORT, () => {
-    console.log(`🚀 Server วิ่งอยู่ที่พอร์ต ${PORT}`);
-});
+server.listen(PORT, () => console.log(`🚀 Server Running on http://localhost:${PORT}`));
