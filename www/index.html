@@ -27,7 +27,10 @@
                 
                 <div class="form-group">
                     <label for="login-password">Password</label>
-                    <input type="password" id="login-password" name="password" placeholder="••••••••" required autocomplete="current-password">
+                    <div class="password-input-wrapper">
+                        <input type="password" id="login-password" name="password" placeholder="••••••••" required autocomplete="current-password">
+                        <span class="material-symbols-outlined toggle-password" onclick="togglePasswordVisibility()">visibility_off</span>
+                    </div>
                 </div>
                 
                 <div id="email-error" class="error-text"></div> 

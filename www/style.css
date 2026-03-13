@@ -89,6 +89,7 @@ body::before {
     text-align: center;
     margin-bottom: 40px;
     position: relative;
+    padding-top: 10px; /* Space for absolute logout button */
 }
 
 .header-brand {
@@ -130,8 +131,9 @@ body::before {
 /* Logout Button */
 .logout-btn {
     position: absolute;
-    top: 0;
+    top: -10px;
     right: 0;
+    z-index: 10;
     background: white;
     color: var(--text-muted);
     border: 1px solid var(--border-card);
@@ -518,6 +520,11 @@ body::before {
     .room-card {
         padding: 24px 20px;
     }
+    
+    .logout-btn {
+        padding: 6px 12px;
+        font-size: 0.75rem;
+    }
 }
 
 @media (min-width: 601px) and (max-width: 900px) {
@@ -644,6 +651,29 @@ body::before {
     transition: all 0.3s ease;
     font-family: inherit;
     background: transparent;
+}
+
+.password-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-wrapper input {
+    padding-right: 3rem;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 1rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s;
+}
+
+.toggle-password:hover {
+    color: var(--primary);
 }
 
 .form-group input:focus {

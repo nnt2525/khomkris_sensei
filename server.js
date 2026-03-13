@@ -7,6 +7,7 @@ const path = require('path');
 const session = require('express-session');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
+const cors = require('cors');
 
 console.log('DB_USER:', process.env.DB_USER); 
 console.log('DB_NAME:', process.env.DB_NAME);
@@ -15,12 +16,16 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+app.use(cors({
+    origin: true,
+    credentials: true
+}));
 app.use(express.json()); 
-app.use(express.static(path.join(__dirname, 'static')));
+app.use(express.static(path.join(__dirname, 'www')));
 
 // บอก Express ว่าถ้ามีคนพิมพ์ URL ว่า /dashboard ให้ส่งไฟล์ dashboard.html ไปให้
 app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, 'static', 'dashboard.html'));
+    res.sendFile(path.join(__dirname, 'www', 'dashboard.html'));
 });
 
 // แก้ตรงนี้: ใส่ || ไว้กันเซิร์ฟเวอร์พังเผื่อหาค่าใน .env ไม่เจอ

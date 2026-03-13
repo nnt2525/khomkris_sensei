@@ -1,14 +1,15 @@
-const BASE_URL = ""; 
+// เปลี่ยน URL ให้อ้างอิงแบบ Relative ไปยัง Server หลักได้เลย เพราะเรารัน Capacitor ชี้ไปที่ Server ตรงๆ แล้ว
+const BASE_URL = "";
 
 // ==========================================
 // 1. ระบบจัดการหน้าเว็บ (Router & Auth Guard)
 // ==========================================
 async function checkAuth() {
     try {
-        const response = await fetch('/api/check-auth');
+        const response = await fetch(`${BASE_URL}/api/check-auth`, { credentials: 'include' });
         return await response.json(); 
     } catch (error) {
-        console.error('Error checking auth:', error);
+        console.error('Error checking auth:', error.message, error.name, error);
         return { isLoggedIn: false };
     }
 }
@@ -22,12 +23,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isLoggedIn = authData.isLoggedIn;
 
     if (isLoginPage && isLoggedIn) {
-        window.location.href = '/dashboard.html'; 
+        window.location.href = 'dashboard.html'; 
         return; 
     } 
     
     if (isDashboardPage && !isLoggedIn) {
-        window.location.href = '/login.html'; 
+        window.location.href = 'index.html'; 
         return; 
     }
 
@@ -37,6 +38,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         setupWebSocket(); // เริ่มทำงาน WebSocket
     }
 });
+
+// ==========================================
+// 1.5. ระบบ UI (Password Toggle)
+// ==========================================
+window.togglePasswordVisibility = function() {
+    const passwordInput = document.getElementById('login-password');
+    const toggleIcon = document.querySelector('.toggle-password');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleIcon.textContent = 'visibility';
+    } else {
+        passwordInput.type = 'password';
+        toggleIcon.textContent = 'visibility_off';
+    }
+};
 
 // ==========================================
 // 2. ระบบเข้าสู่ระบบ (Login)
@@ -53,13 +70,14 @@ window.handleLogin = async function(event) {
         const response = await fetch(`${BASE_URL}/api/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ email, password })
         });
 
         const data = await response.json();
         if (data.status === 'ok') {
             localStorage.setItem('user', JSON.stringify(data.user));
-            window.location.href = '/dashboard.html'; 
+            window.location.href = 'dashboard.html'; 
         } else {
             if(emailError) {
                 emailError.innerText = data.message;
@@ -67,7 +85,7 @@ window.handleLogin = async function(event) {
             } else { alert(data.message); }
         }
     } catch (err) {
-        console.error('Login Error:', err);
+        console.error('Login Error:', err.message, err);
         alert('ไม่สามารถเชื่อมต่อ Server ได้');
     }
 };
@@ -76,7 +94,7 @@ window.handleLogin = async function(event) {
 // 3. ระบบจัดการอุปกรณ์ (Devices)
 // ==========================================
 function fetchDevices(userId) {
-    fetch(`/api/devices/${userId}`)
+    fetch(`${BASE_URL}/api/devices/${userId}`, { credentials: 'include' })
         .then(response => response.json())
         .then(data => {
             if (data.status === 'ok') { renderDevices(data.devices); }
@@ -123,7 +141,7 @@ function renderDevices(devices) {
 // 4. ระบบ WebSocket (Real-time)
 // ==========================================
 function setupWebSocket() {
-    const wsUrl = "ws://10.150.106.101:3000"; 
+    const wsUrl = `ws://${window.location.host}`; // ต่อ WebSocket กับหน้าเว็บที่เปิดอยู่ปัจจุบันเสมอ
     window.ws = new WebSocket(wsUrl);
 
     const statusText = document.getElementById("statusText");
@@ -168,9 +186,10 @@ window.toggleDeviceStatus = async function(deviceId, isChecked) {
 
     // 2. บันทึกลง Database
     try {
-        await fetch(`/api/devices/${deviceId}/status`, {
+        await fetch(`${BASE_URL}/api/devices/${deviceId}/status`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ status: isChecked ? 1 : 0 })
         });
         console.log('💾 บันทึกลง Database สำเร็จ');
@@ -196,9 +215,9 @@ window.handleLogout = async function(event) {
     event.preventDefault();
     localStorage.removeItem('user');
     try {
-        await fetch('/api/logout', { method: 'POST' }); 
+        await fetch(`${BASE_URL}/api/logout`, { method: 'POST', credentials: 'include' }); 
     } catch (err) {
         console.error('Logout Backend Error:', err);
     }
-    window.location.href = 'login.html'; 
+    window.location.href = 'index.html'; 
 };

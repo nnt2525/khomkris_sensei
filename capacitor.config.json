@@ -1,0 +1,10 @@
+{
+  "appId": "com.glowup.glowly",
+  "appName": "glowly",
+  "webDir": "www",
+  "server": {
+    "url": "http://10.0.2.2:3000",
+    "cleartext": true,
+    "allowNavigation": ["10.0.2.2", "localhost"]
+  }
+}
