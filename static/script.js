@@ -1,10 +1,8 @@
-const BASE_URL = ""; // ปล่อยว่างไว้ถ้าใช้ Server เดียวกัน
+const BASE_URL = ""; 
 
 // ==========================================
 // 1. ระบบจัดการหน้าเว็บ (Router & Auth Guard)
 // ==========================================
-
-// ถาม Backend ว่าล็อกอินหรือยัง
 async function checkAuth() {
     try {
         const response = await fetch('/api/check-auth');
@@ -15,55 +13,36 @@ async function checkAuth() {
     }
 }
 
-// ทำงานทันทีที่โหลดหน้าเว็บเสร็จ
 document.addEventListener('DOMContentLoaded', async () => {
     const currentPath = window.location.pathname;
-    
-    // แยกแยะว่าตอนนี้อยู่หน้าไหน
     const isLoginPage = currentPath === '/' || currentPath.endsWith('index.html') || currentPath.endsWith('login.html');
     const isDashboardPage = currentPath.includes('dashboard');
 
-    // เช็คสถานะการล็อกอิน
     const authData = await checkAuth();
     const isLoggedIn = authData.isLoggedIn;
 
-    // --- กฎการป้องกันหน้าเว็บ (เตะไปมาแบบไม่วนลูป) ---
     if (isLoginPage && isLoggedIn) {
-        // ถ้าอยู่หน้า Login แต่เข้าสู่ระบบแล้ว -> ดีดไป Dashboard
         window.location.href = '/dashboard.html'; 
         return; 
     } 
     
     if (isDashboardPage && !isLoggedIn) {
-        // ถ้าอยู่หน้า Dashboard แต่ยังไม่ได้ล็อกอิน -> ดีดกลับไป Login
-        window.location.href = '/'; 
+        window.location.href = '/login.html'; 
         return; 
     }
 
-    // --- ถ้าผ่านด่านเช็คมาได้ ให้รันสคริปต์ตามหน้าเว็บที่อยู่ ---
     if (isDashboardPage) {
         console.log('✅ ล็อกอินผ่านแล้ว! รหัสผู้ใช้:', authData.userId);
-        
-        // ดึงข้อมูลอุปกรณ์มาแสดง (ใช้ ID จาก Backend ชัวร์สุด)
         fetchDevices(authData.userId);
-
-        // เปิดใช้งาน WebSocket
-        const statusText = document.getElementById("status");
-        if (statusText) {
-            setupWebSocket();
-        }
+        setupWebSocket(); // เริ่มทำงาน WebSocket
     }
 });
-
 
 // ==========================================
 // 2. ระบบเข้าสู่ระบบ (Login)
 // ==========================================
-
-// ผูกไว้กับตัวแปร window เพื่อให้ HTML (onsubmit) เรียกใช้ได้
 window.handleLogin = async function(event) {
-    event.preventDefault(); // ป้องกันหน้าเว็บรีเฟรช
-    
+    event.preventDefault();
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
     const emailError = document.getElementById('email-error');
@@ -78,18 +57,14 @@ window.handleLogin = async function(event) {
         });
 
         const data = await response.json();
-
         if (data.status === 'ok') {
-            // บันทึกข้อมูลลง localStorage เผื่อเอาไปใช้แสดงชื่อบนหน้าเว็บ
             localStorage.setItem('user', JSON.stringify(data.user));
             window.location.href = '/dashboard.html'; 
         } else {
             if(emailError) {
                 emailError.innerText = data.message;
                 emailError.style.display = 'block';
-            } else {
-                alert(data.message);
-            }
+            } else { alert(data.message); }
         }
     } catch (err) {
         console.error('Login Error:', err);
@@ -97,29 +72,21 @@ window.handleLogin = async function(event) {
     }
 };
 
-
 // ==========================================
 // 3. ระบบจัดการอุปกรณ์ (Devices)
 // ==========================================
-
 function fetchDevices(userId) {
     fetch(`/api/devices/${userId}`)
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'ok') {
-                renderDevices(data.devices);
-            }
+            if (data.status === 'ok') { renderDevices(data.devices); }
         })
         .catch(err => console.error('Error fetching devices:', err));
 }
 
 function renderDevices(devices) {
     const container = document.getElementById('device-list'); 
-    
-    // [แก้ Error] เช็คก่อนว่ามีกล่องนี้ในหน้าเว็บไหม ถ้าไม่มีให้หยุดการทำงาน
     if (!container) return;
-
-    // เคลียร์ข้อมูลเก่าทิ้งก่อน (ลบคำสั่ง container.innerHTML = htmlString ออกแล้ว)
     container.innerHTML = ''; 
 
     if (!devices || devices.length === 0) {
@@ -132,51 +99,106 @@ function renderDevices(devices) {
         card.className = 'device-card';
         card.innerHTML = `
             <h3>${device.device_name}</h3>
-            <p>สถานะ: <span id="status-${device.id}">${device.status ? 'เปิด' : 'ปิด'}</span></p>
-            <button onclick="sendTrigger('toggle_${device.id}')">ควบคุม</button>
+            <div class="toggle-wrapper">
+                <span class="toggle-label label-off">OFF</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" 
+                           id="toggle-${device.id}" 
+                           onchange="toggleDeviceStatus(${device.id}, this.checked)"
+                           ${device.status === 1 ? 'checked' : ''}>
+                    <span class="toggle-track"></span>
+                    <span class="toggle-thumb"></span>
+                </label>
+                <span class="toggle-label label-on">ON</span>
+            </div>
+            <div class="room-status" id="status-${device.id}" style="color: ${device.status === 1 ? '#ff7043' : '#888888'}">
+                ● Light ${device.status === 1 ? 'ON' : 'OFF'}
+            </div>
         `;
         container.appendChild(card);
     });
 }
 
-
 // ==========================================
 // 4. ระบบ WebSocket (Real-time)
 // ==========================================
-let ws;
-
 function setupWebSocket() {
-    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-    ws = new WebSocket(protocol + window.location.host);
-    const statusText = document.getElementById("status");
+    const wsUrl = "ws://10.150.106.101:3000"; 
+    window.ws = new WebSocket(wsUrl);
 
-    ws.onopen = () => {
-        console.log("✅ Connected to WebSocket Server!");
-        if(statusText) {
-            statusText.innerText = "Connected";
-            statusText.style.color = "green";
+    const statusText = document.getElementById("statusText");
+    const statusBadge = document.getElementById("statusBadge");
+
+    window.ws.onopen = () => {
+        console.log("✅ WebSocket Connected!");
+        if (statusText && statusBadge) {
+            statusText.innerText = "CONNECTED";
+            statusBadge.classList.remove("connecting", "disconnected");
+            statusBadge.classList.add("connected");
         }
     };
 
-    ws.onclose = () => {
-        console.log("❌ Disconnected from Server");
-        if(statusText) {
-            statusText.innerText = "Disconnected";
-            statusText.style.color = "red";
+    window.ws.onclose = () => {
+        console.log("❌ WebSocket Disconnected!");
+        if (statusText && statusBadge) {
+            statusText.innerText = "DISCONNECTED";
+            statusBadge.classList.remove("connected", "connecting");
+            statusBadge.classList.add("disconnected");
         }
-        // พยายามต่อใหม่ทุก 5 วินาที
-        setTimeout(setupWebSocket, 5000);
+        setTimeout(setupWebSocket, 3000); // Reconnect
     };
 
-    ws.onerror = (err) => console.error("WebSocket Error:", err);
+    window.ws.onerror = (err) => {
+        console.error("🚨 WebSocket Error:", err);
+    };
 }
 
-// เปิดให้ HTML เรียกใช้ได้
-window.sendTrigger = function(action) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(action);
-        console.log('📤 Sent:', action);
-    } else {
-        alert('WebSocket is not connected!');
+// ==========================================
+// 5. ระบบควบคุมไฟ (UI + Database + WebSocket)
+// ==========================================
+window.toggleDeviceStatus = async function(deviceId, isChecked) {
+    console.log(`🔘 กดสวิตช์อุปกรณ์ที่ ${deviceId} สถานะ: ${isChecked ? 'ON' : 'OFF'}`);
+    
+    // 1. อัปเดต UI ทันที
+    const statusTextDiv = document.getElementById(`status-${deviceId}`);
+    if (statusTextDiv) {
+        statusTextDiv.innerText = isChecked ? '● Light ON' : '● Light OFF';
+        statusTextDiv.style.color = isChecked ? '#ff7043' : '#888888'; 
     }
+
+    // 2. บันทึกลง Database
+    try {
+        await fetch(`/api/devices/${deviceId}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: isChecked ? 1 : 0 })
+        });
+        console.log('💾 บันทึกลง Database สำเร็จ');
+    } catch (err) {
+        console.error('❌ DB Update Error:', err);
+    }
+
+    // 3. ส่งคำสั่งไป ESP32
+    if (window.ws && window.ws.readyState === WebSocket.OPEN) {
+        const action = isChecked ? 'OPEN_TRUNON' : 'CLOSE_TRUNOFF';
+        const command = `${action}_ROOM${deviceId}`;
+        window.ws.send(command);
+        console.log(`📤 ส่งคำสั่งไป ESP32: ${command}`);
+    } else {
+        console.warn('⚠️ WebSocket ยังไม่เชื่อมต่อ (อัปเดตแค่ DB)');
+    }
+};
+
+// ==========================================
+// 6. ระบบออกจากระบบ (Logout)
+// ==========================================
+window.handleLogout = async function(event) {
+    event.preventDefault();
+    localStorage.removeItem('user');
+    try {
+        await fetch('/api/logout', { method: 'POST' }); 
+    } catch (err) {
+        console.error('Logout Backend Error:', err);
+    }
+    window.location.href = 'login.html'; 
 };

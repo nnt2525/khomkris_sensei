@@ -1,35 +1,61 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ESP32 Native WebSocket Control</title>
-    <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Smart Home</title>
+    <script>
+        if (!localStorage.getItem('user')) {
+            window.location.replace('login.html');
+        }
+    </script>
+    <link rel="icon" href="data:,">
+    <meta name="description" content="Smart Home Control Panel - ควบคุมไฟ LED ผ่าน ESP32 WiFi">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <h1>ESP32 Control Panel</h1>
+    <div class="app-container">
 
-    <div id="status-container">
-        Status: <span id="status">Connecting...</span>
+        <!-- Header -->
+        <header class="header">
+            <a href="#" class="logout-btn" onclick="handleLogout(event)">Logout</a>
+            <div class="header-brand">
+                <div class="header-logo">🏠</div>
+                <h1>ESP32 Smart Home</h1>
+            </div>
+            <p class="header-subtitle">WiFi LED Control Panel</p>
+        </header>
+
+        <!-- Connection Status -->
+        <center>    
+        <div id="statusBadge" class="status-badge connecting">
+            <span class="status-dot"></span>
+            <span id="statusText">Connecting…</span>
+        </div>
+        </center>
+        <br>
+
+        <!-- Room Cards Grid -->
+
+        
+        <!-- Dynamic Devices -->
+        <div id="device-list" class="rooms-grid"></div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>ESP32 Smart Home Powered by WebSocket</p>
+        </footer>
+
     </div>
 
-    <div class="button-container">
-        <hr />
-        <p>ห้องนอน</p>
-        <button class="open-button" onclick="sendTrigger('OPEN_TRUNON_ROOM1')">เปิดไฟ (ON)</button>
-        <button class="close-button" onclick="sendTrigger('CLOSE_TRUNOFF_ROOM1')">ปิดไฟ (OFF)</button><br />
-        <hr />
-        <p>ห้องนั่งเล่น</p>
-        <button class="open-button" onclick="sendTrigger('OPEN_TRUNON_ROOM2')">เปิดไฟ (ON)</button>
-        <button class="close-button" onclick="sendTrigger('CLOSE_TRUNOFF_ROOM2')">ปิดไฟ (OFF)</button><br />
-        <hr />
-        <p>ห้องครัว</p>
-        <button class="open-button" onclick="sendTrigger('OPEN_TRUNON_ROOM3')">เปิดไฟ (ON)</button>
-        <button class="close-button" onclick="sendTrigger('CLOSE_TRUNOFF_ROOM3')">ปิดไฟ (OFF)</button><br />
-        <hr />
-    </div>
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
 
+    <!-- นำเข้า script.js ที่รวมทุกโลจิกเอาไว้ -->
     <script src="script.js"></script>
+
 </body>
 </html>

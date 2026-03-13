@@ -77,6 +77,20 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+// API สำหรับออกจากระบบ (ทำลาย Session)
+app.post('/api/logout', (req, res) => {
+    // สั่งทำลาย Session ของ User คนนี้ทิ้ง
+    req.session.destroy((err) => {
+        if (err) {
+            console.error('Error destroying session:', err);
+            return res.status(500).json({ status: 'error', message: 'ไม่สามารถออกจากระบบได้' });
+        }
+        // ล้างคุกกี้ฝั่งเบราว์เซอร์ให้สะอาด
+        res.clearCookie('connect.sid'); 
+        res.json({ status: 'ok', message: 'ออกจากระบบสำเร็จ' });
+    });
+});
+
 const requireLogin = (req, res, next) => {
     // ตรวจสอบว่ามี session และมีสถานะ isLoggedIn เป็น true หรือไม่
     if (req.session && req.session.isLoggedIn) {
@@ -98,6 +112,22 @@ app.get('/api/devices/:userId', requireLogin, async (req, res) => {
     }
 });
 
+// API สำหรับอัปเดตสถานะไฟลง Database
+app.put('/api/devices/:id/status', async (req, res) => {
+    try {
+        const deviceId = req.params.id;
+        const newStatus = req.body.status; // จะรับค่า 0 หรือ 1 มาจากหน้าเว็บ
+
+        // สั่งอัปเดตข้อมูลในฐานข้อมูล
+        await db.query('UPDATE devices SET status = ? WHERE id = ?', [newStatus, deviceId]);
+        
+        res.json({ status: 'ok', message: 'อัปเดตสถานะใน Database เรียบร้อย' });
+    } catch (err) {
+        console.error('Database Update Error:', err);
+        res.status(500).json({ status: 'error', message: 'ไม่สามารถอัปเดตฐานข้อมูลได้' });
+    }
+});
+
 app.get('/api/check-auth', (req, res) => {
     if (req.session && req.session.isLoggedIn) {
         res.json({ status: 'ok', isLoggedIn: true, userId: req.session.userId });
@@ -106,8 +136,30 @@ app.get('/api/check-auth', (req, res) => {
     }
 });
 
-wss.on('connection', (ws) => {
-    console.log('✅ อุปกรณ์เชื่อมต่อแล้ว');
+
+
+wss.on('connection', async (ws) => {  // <--- เติม async ตรงนี้
+    console.log('✅ อุปกรณ์ (หรือ Web) เชื่อมต่อ WebSocket แล้ว');
+
+    // ==========================================
+    // ส่วนที่ 1 (เพิ่มใหม่): ซิงค์ข้อมูลจาก Database ทันทีที่เพิ่งต่อติด
+    // ==========================================
+    try {
+        const [devices] = await db.query('SELECT * FROM devices');
+        devices.forEach(device => {
+            // สร้างคำสั่งให้ตรงกับที่ C Code ของ ESP32 รอรับอยู่
+            // (เช่น OPEN_TRUNON_ROOM1 หรือ CLOSE_TRUNOFF_ROOM1)
+            const action = device.status === 1 ? 'OPEN_TRUNON' : 'CLOSE_TRUNOFF';
+            ws.send(`${action}_ROOM${device.id}`); 
+        });
+        console.log('📥 สาดข้อมูลสถานะเริ่มต้นให้ Client เรียบร้อย');
+    } catch (err) {
+        console.error('❌ ดึงสถานะเริ่มต้นจาก DB ไม่สำเร็จ:', err);
+    }
+
+    // ==========================================
+    // ส่วนที่ 2 (ของเดิม): รับคำสั่งจากหน้าเว็บ แล้วกระจายต่อให้ ESP32
+    // ==========================================
     ws.on('message', (message) => {
         const command = message.toString();
         wss.clients.forEach((client) => {
@@ -119,4 +171,6 @@ wss.on('connection', (ws) => {
 });
 
 const PORT = 3000;
-server.listen(PORT, () => console.log(`🚀 Server Running on http://localhost:${PORT}`));
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server running at http://0.0.0.0:${PORT}`);
+});
