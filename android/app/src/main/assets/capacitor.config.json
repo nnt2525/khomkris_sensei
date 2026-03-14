@@ -1,0 +1,15 @@
+{
+	"appId": "com.glowup.glowly",
+	"webDir": "www",
+	"server": {
+		"cleartext": true,
+		"allowNavigation": [
+			"*"
+		]
+	},
+	"plugins": {
+		"CapacitorHttp": {
+			"enabled": true
+		}
+	}
+}
