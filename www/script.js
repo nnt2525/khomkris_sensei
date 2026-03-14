@@ -1,5 +1,5 @@
-// เปลี่ยน URL ให้อ้างอิงแบบ Relative ไปยัง Server หลักได้เลย เพราะเรารัน Capacitor ชี้ไปที่ Server ตรงๆ แล้ว
-const BASE_URL = "";
+// เปลี่ยน URL ไปยัง IP ของคอมพิวเตอร์ในวง LAN เครื่องนี้ (สำหรับการทดสอบบนมือถือจริง)
+const BASE_URL = "http://10.150.106.158:3000";
 
 // ==========================================
 // 1. ระบบจัดการหน้าเว็บ (Router & Auth Guard)
@@ -10,6 +10,7 @@ async function checkAuth() {
         return await response.json(); 
     } catch (error) {
         console.error('Error checking auth:', error.message, error.name, error);
+        alert('DEBUG: Auth check failed - ' + error.message + ' URL: ' + BASE_URL);
         return { isLoggedIn: false };
     }
 }
@@ -86,7 +87,7 @@ window.handleLogin = async function(event) {
         }
     } catch (err) {
         console.error('Login Error:', err.message, err);
-        alert('ไม่สามารถเชื่อมต่อ Server ได้');
+        alert('DEBUG: Login Error - ' + err.message + ' URL: ' + BASE_URL);
     }
 };
 
@@ -141,7 +142,9 @@ function renderDevices(devices) {
 // 4. ระบบ WebSocket (Real-time)
 // ==========================================
 function setupWebSocket() {
-    const wsUrl = `ws://${window.location.host}`; // ต่อ WebSocket กับหน้าเว็บที่เปิดอยู่ปัจจุบันเสมอ
+    // ตั้งค่า WebSocket ให้ยิงไปที่คอมพิวเตอร์แบบเจาะจงเลย (แก้ไขปัญหา Webview ทับซ้อน)
+    const wsUrl = "ws://10.150.106.158:3000"; 
+    
     window.ws = new WebSocket(wsUrl);
 
     const statusText = document.getElementById("statusText");
